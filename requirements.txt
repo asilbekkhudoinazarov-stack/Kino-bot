@@ -1,2 +1,1 @@
-aiogram==2.24
-flask
+python-3.11
