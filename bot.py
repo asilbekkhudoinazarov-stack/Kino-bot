@@ -3,11 +3,13 @@ import json
 import os
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from flask import Flask
+from threading import Thread
 
-# ===== TOKEN VA KANAL =====
-API_TOKEN = os.getenv("BOT_TOKEN")
-KANAL_ID = "@kino_top_24"
-ADMINS = [7310599180, 5977950655]
+# ===== BOT TOKEN VA KANAL =====
+API_TOKEN = os.getenv("BOT_TOKEN")  # Secrets dan olasiz
+KANAL_ID = "@kino_top_24"            # Kanal username (masalan: @kino_top_24)
+ADMINS = [7310599180, 5977950655]     # Admin Telegram ID lar
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
@@ -47,7 +49,6 @@ async def start(message: types.Message):
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add(KeyboardButton("🎬 Kino kod yuborish"))
     kb.add(KeyboardButton("🆘 Yordam"))
-
     if message.from_user.id in ADMINS:
         kb.add(KeyboardButton("⚙️ Admin panel"))
 
@@ -126,9 +127,9 @@ async def delete_movie(message: types.Message):
         if code in movies:
             movies.pop(code)
             save_movies(movies)
-            await m.answer(f"✅ Kino {code} o‘chirildi")
+            await message.answer(f"✅ Kino {code} o‘chirildi")
         else:
-            await m.answer("❌ Bunday kino topilmadi")
+            await message.answer("❌ Bunday kino topilmadi")
         dp.message_handlers.unregister(remove_code)
 
 # ===== BOT STATISTIKASI =====
@@ -160,6 +161,22 @@ async def send_movie(message: types.Message):
     else:
         await message.answer("❌ Bunday kino topilmadi!")
 
+# ===== FLASK SERVER (PING UCHUN) =====
+app = Flask("")
+
+@app.route("/")
+def home():
+    return "Bot ishlayapti ✅"
+
+def run():
+    app.run(host="0.0.0.0", port=8080)
+
+def keep_alive():
+    from threading import Thread
+    t = Thread(target=run)
+    t.start()
+
 # ===== BOTNI ISHGA TUSHURISH =====
 if __name__ == "__main__":
+    keep_alive()
     executor.start_polling(dp, skip_updates=True)
