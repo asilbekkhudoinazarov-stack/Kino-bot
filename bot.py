@@ -5,11 +5,11 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
 # ===== TOKEN VA KANAL =====
-API_TOKEN = os.getenv 8735477684:AAE0vS34otIUJFHehfqCWslivG-j_vFK7gc # tokenni Railway Variablesga qo'y
-KANAL_ID = @kino_top_24  # kanal username
+API_TOKEN = os.getenv("8735477684:AAE0vS34otIUJFHehfqCWslivG-j_vFK7gc")  # Railway yoki local environmentda qo'yiladi
+KANAL_ID = "@kino_top_24"  # Telegram kanal username
 
 # ===== ADMINLAR =====
-ADMINS = [7310599180, 5977950655]  # SEN VA DOSTING ID
+ADMINS = [7310599180, 5977950655]  # SEN VA DOSTING TELEGRAM ID
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
@@ -43,16 +43,17 @@ async def check_sub(user_id):
 async def start(message: types.Message):
     if not await check_sub(message.from_user.id):
         btn = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("📢 Kanalga obuna bo‘lish", url=f"https://t.me/{KANAL_ID[1:]}")
+            InlineKeyboardButton(
+                "📢 Kanalga obuna bo‘lish",
+                url=f"https://t.me/{KANAL_ID[1:]}"
+            )
         )
         return await message.answer("❌ Avval kanalga obuna bo‘ling!", reply_markup=btn)
 
-    # USER MENU
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add(KeyboardButton("🎬 Kino kod yuborish"))
     kb.add(KeyboardButton("🆘 Yordam"))
 
-    # ADMIN PANEL FAOL
     if message.from_user.id in ADMINS:
         kb.add(KeyboardButton("⚙️ Admin panel"))
 
@@ -83,7 +84,6 @@ async def admin_panel(message: types.Message):
 async def add_movie(message: types.Message):
     if message.from_user.id not in ADMINS:
         return
-
     await message.answer("📤 Videoni yuboring")
 
     @dp.message_handler(content_types=types.ContentType.VIDEO)
@@ -91,7 +91,7 @@ async def add_movie(message: types.Message):
         if msg.from_user.id not in ADMINS:
             return
         file_id = msg.video.file_id
-        await msg.answer("🔑 Kod yozing")
+        await msg.answer("🔑 Kino kodi yozing")
 
         @dp.message_handler()
         async def save_code(m):
@@ -117,7 +117,10 @@ async def stats(message: types.Message):
 async def send_movie(message: types.Message):
     if not await check_sub(message.from_user.id):
         btn = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("📢 Kanalga obuna bo‘lish", url=f"https://t.me/{KANAL_ID[1:]}")
+            InlineKeyboardButton(
+                "📢 Kanalga obuna bo‘lish",
+                url=f"https://t.me/{KANAL_ID[1:]}"
+            )
         )
         return await message.answer("❌ Kanalga obuna bo‘ling!", reply_markup=btn)
 
