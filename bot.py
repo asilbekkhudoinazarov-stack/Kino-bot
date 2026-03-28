@@ -6,7 +6,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
-API_TOKEN = os.getenv("8735477684:AAE0vS34otIUJFHehfqCWslivG-j_vFK7gc")
+API_TOKEN=os.getenv("8735477684:AAE0vS34otIUJFHehfqCWslivG-j_vFK7gc")
 KANAL_ID = "@kino_top_24"
 ADMINS = [7310599180, 5977950655]
 
