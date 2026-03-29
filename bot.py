@@ -5,7 +5,8 @@ from aiogram.utils import executor
 from aiogram.dispatcher.filters import Text
 import json
 
-API_TOKEN = '8735477684:AAE0vS34otIUJFHehfqCWslivG-j_vFK7gc'
+import os
+API_TOKEN = os.getenv("API_TOKEN")
 ADMIN_IDS = [7310599180, 5977950655]  # Bu yerga admin telegram IDlarini yozing
 CHANNEL_USERNAME = "@SIZNING_KANAL"  # Majburiy obuna kanali
 
