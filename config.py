@@ -1,0 +1,3 @@
+TOKEN = "8735477684:AAE0vS34otIUJFHehfqCWslivG-j_vFK7gc"
+CHANNEL_ID = "@kino_top_24"
+ADMINS = [7310599180, 5977950655]  # 2 ta admin Telegram ID
