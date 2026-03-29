@@ -1,67 +1,98 @@
+import sqlite3
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils import executor
-from db import add_movie, get_movie, delete_movie
-import os
 
-TOKEN = "SENING_BOT_TOKENING"  # <-- bu yerga o'zingning tokeningni qo'y
-bot = Bot(token=TOKEN)
+# TOKEN ni o'zingizning bot tokeningiz bilan almashtiring
+BOT_TOKEN = "8735477684:AAE0vS34otIUJFHehfqCWslivG-j_vFK7gc"
+
+# Adminlar ID sini qo'shing
+ADMIN_IDS = [7310599180, 5977950655]  # misol
+
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 
-# Adminlar ro'yxati
-ADMINS = [7310599180, 5977950655]  # <-- bu yerga admin telegram idlarini qo'y
+# SQLite bazasi
+conn = sqlite3.connect("kino.db")
+cursor = conn.cursor()
+cursor.execute("""CREATE TABLE IF NOT EXISTS kino (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT,
+                    file_id TEXT
+                )""")
+conn.commit()
 
-# Boshlang'ich tugmalar
-main_kb = ReplyKeyboardMarkup(resize_keyboard=True)
-main_kb.add(KeyboardButton("➕ Kino qo‘shish"))
-main_kb.add(KeyboardButton("📽 Kinoni ko‘rish"))
+# Kino qo'shish jarayoni uchun user step
+kino_step = {}
 
-# State saqlash (qaysi admin video tashlamoqchi)
-admin_state = {}
+# Asosiy menyu
+def main_menu():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(KeyboardButton("Kino qo‘shish"))
+    return markup
 
-@dp.message_handler(commands=["start"])
-async def start(message: types.Message):
-    await message.answer("Salom! Botga xush kelibsiz.", reply_markup=main_kb)
+# Start handler
+@dp.message_handler(commands=['start'])
+async def start_handler(message: types.Message):
+    await message.answer("Salom! Botga xush kelibsiz.", reply_markup=main_menu())
 
-# Admin kino qo‘shish tugmasini bosganda
-@dp.message_handler(lambda m: m.text == "➕ Kino qo‘shish" and m.from_user.id in ADMINS)
-async def add_movie_start(message: types.Message):
-    admin_state[message.from_user.id] = "await_video"
-    await message.answer("Videoni yuboring:")
+# Kino qo'shish boshlanishi
+@dp.message_handler(lambda message: message.text == "Kino qo‘shish")
+async def add_kino_start(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("Siz admin emassiz!")
+        return
+    kino_step[message.from_user.id] = "awaiting_name"
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(KeyboardButton("Ortga"))
+    await message.answer("Kino nomini yozing:", reply_markup=markup)
 
-# Video kelganda
-@dp.message_handler(content_types=["video"])
-async def handle_video(message: types.Message):
+# Kino nomi va video qabul qilish
+@dp.message_handler(content_types=["text", "video"])
+async def handle_kino(message: types.Message):
     user_id = message.from_user.id
-    if admin_state.get(user_id) == "await_video":
-        file_id = message.video.file_id
-        admin_state[user_id] = "await_code"
-        admin_state[f"{user_id}_file_id"] = file_id
-        await message.answer("Kodini yozing:")
-    else:
-        await message.answer("❌ Ruxsat yo‘q yoki noto‘g‘ri holat.")
 
-# Kod yozilganda
-@dp.message_handler(lambda m: True)
-async def handle_code(message: types.Message):
-    user_id = message.from_user.id
-    text = message.text.strip()
-    
-    # Agar admin video yuborgan bo‘lsa
-    if admin_state.get(user_id) == "await_code":
-        file_id = admin_state.get(f"{user_id}_file_id")
-        add_movie(text, file_id)
-        admin_state.pop(user_id)
-        admin_state.pop(f"{user_id}_file_id")
-        await message.answer(f"✅ Kino qo‘shildi! Kod: {text}")
+    # Ortga tugmasi
+    if message.text == "Ortga":
+        await start_handler(message)
+        if user_id in kino_step:
+            kino_step.pop(user_id)
         return
 
-    # Agar foydalanuvchi kod bilan kinoni ko‘rmoqchi bo‘lsa
-    file_id = get_movie(text)
-    if file_id:
-        await bot.send_video(message.chat.id, file_id)
+    # Kino qo‘shish jarayoni
+    if user_id in kino_step:
+        step = kino_step[user_id]
+
+        # 1️⃣ Nomni olish
+        if step == "awaiting_name" and message.text:
+            kino_step[user_id] = {"name": message.text, "step": "awaiting_file"}
+            markup = ReplyKeyboardMarkup(resize_keyboard=True)
+            markup.add(KeyboardButton("Ortga"))
+            await message.answer("Endi video faylini yuboring (mp4 formatda):", reply_markup=markup)
+
+        # 2️⃣ Video olish
+        elif isinstance(step, dict) and step.get("step") == "awaiting_file":
+            if not message.video:
+                await message.answer("Iltimos, faqat video yuboring!")
+                return
+            name = step["name"]
+            file_id = message.video.file_id
+            cursor.execute("INSERT INTO kino (name, file_id) VALUES (?, ?)", (name, file_id))
+            conn.commit()
+            await message.answer(f"{name} kinoni qo‘shdingiz ✅", reply_markup=main_menu())
+            kino_step.pop(user_id)
+
+# Kino ro‘yxatini ko‘rsatish (misol)
+@dp.message_handler(commands=['kino'])
+async def list_kino(message: types.Message):
+    cursor.execute("SELECT name FROM kino")
+    kinolar = cursor.fetchall()
+    if kinolar:
+        msg = "\n".join([kino[0] for kino in kinolar])
+        await message.answer(f"Mavjud kinolar:\n{msg}")
     else:
-        await message.answer("❌ Kino topilmadi.")
-        
+        await message.answer("Hozircha kino yo‘q.")
+
+# Bot ishga tushurish
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
