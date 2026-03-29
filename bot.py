@@ -1,35 +1,22 @@
 import logging
-import json
 import os
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from flask import Flask
 from threading import Thread
 
-# ===== SOZLAMALAR =====
+from db import add_movie, get_movie, delete_movie, get_all_movies
+
 API_TOKEN = os.getenv("BOT_TOKEN")
-KANAL_ID = "@kino_top_24"  # <-- BU YERNI O'ZGARTIR
-ADMINS = [7310599180, 5977950655]  # <-- ADMIN ID
+KANAL_ID = "@kino_top_24"
+ADMINS = [5977950655, 7310599180]
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
 logging.basicConfig(level=logging.INFO)
-DB_FILE = "movies.json"
 
-# ===== BAZA =====
-def load_movies():
-    try:
-        with open(DB_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def save_movies(data):
-    with open(DB_FILE, "w") as f:
-        json.dump(data, f, indent=4)
-
-# ===== OBUNA TEKSHIRISH =====
+# ===== OBUNA =====
 async def check_sub(user_id):
     try:
         member = await bot.get_chat_member(chat_id=KANAL_ID, user_id=user_id)
@@ -60,13 +47,13 @@ def admin_menu():
 async def start(message: types.Message):
     if not await check_sub(message.from_user.id):
         btn = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("📢 Kanalga obuna bo‘lish", url=f"https://t.me/{KANAL_ID[1:]}")
+            InlineKeyboardButton("📢 Obuna bo‘lish", url=f"https://t.me/{KANAL_ID[1:]}")
         )
-        return await message.answer("❌ Botdan foydalanish uchun kanalga obuna bo‘ling!", reply_markup=btn)
+        return await message.answer("❌ Avval kanalga obuna bo‘ling!", reply_markup=btn)
 
     await message.answer("👋 Xush kelibsiz!\n🔑 Kino kodini yuboring.", reply_markup=main_menu(message.from_user.id))
 
-# ===== KINO KOD BOSILDI =====
+# ===== KOD SO‘RASH =====
 @dp.message_handler(lambda m: m.text == "🎬 Kino kod yuborish")
 async def ask_code(message: types.Message):
     await message.answer("🔑 Kino kodini yozing:")
@@ -89,58 +76,47 @@ async def back(message: types.Message):
 
 # ===== KINO QO‘SHISH =====
 @dp.message_handler(lambda m: m.text == "➕ Kino qo‘shish")
-async def add_movie(message: types.Message):
+async def add_movie_handler(message: types.Message):
     if message.from_user.id not in ADMINS:
         return
     await message.answer("📤 Video yuboring")
 
     @dp.message_handler(content_types=types.ContentType.VIDEO)
     async def get_video(msg: types.Message):
-        if msg.from_user.id not in ADMINS:
-            return
         file_id = msg.video.file_id
         await msg.answer("🔑 Kod yozing")
 
         @dp.message_handler()
         async def save_code(m):
             code = m.text.strip()
-            movies = load_movies()
-            movies[code] = file_id
-            save_movies(movies)
-            await m.answer("✅ Kino saqlandi!")
+            add_movie(code, file_id)
+            await m.answer("✅ Saqlandi!")
             dp.message_handlers.unregister(save_code)
 
 # ===== RO‘YXAT =====
 @dp.message_handler(lambda m: m.text == "📋 Kinolar ro‘yxati")
 async def list_movies(message: types.Message):
-    movies = load_movies()
+    movies = get_all_movies()
     if not movies:
-        await message.answer("❌ Kino yo‘q")
+        await message.answer("❌ Bo‘sh")
     else:
-        text = "\n".join([f"🔑 {k}" for k in movies])
-        await message.answer(text)
+        await message.answer("\n".join(movies))
 
 # ===== O‘CHIRISH =====
 @dp.message_handler(lambda m: m.text == "🗑 Kinoni o‘chirish")
-async def delete_movie(message: types.Message):
+async def delete_handler(message: types.Message):
     await message.answer("🔑 Kod yozing")
 
     @dp.message_handler()
     async def remove(m):
-        code = m.text.strip()
-        movies = load_movies()
-        if code in movies:
-            del movies[code]
-            save_movies(movies)
-            await m.answer("✅ O‘chirildi")
-        else:
-            await m.answer("❌ Topilmadi")
+        delete_movie(m.text.strip())
+        await m.answer("✅ O‘chirildi")
         dp.message_handlers.unregister(remove)
 
 # ===== STATISTIKA =====
 @dp.message_handler(lambda m: m.text == "📊 Statistika")
 async def stats(message: types.Message):
-    movies = load_movies()
+    movies = get_all_movies()
     await message.answer(f"🎬 Kinolar soni: {len(movies)}")
 
 # ===== KINO BERISH =====
@@ -150,17 +126,16 @@ async def send_movie(message: types.Message):
         btn = InlineKeyboardMarkup().add(
             InlineKeyboardButton("📢 Obuna bo‘lish", url=f"https://t.me/{KANAL_ID[1:]}")
         )
-        return await message.answer("❌ Avval obuna bo‘ling!", reply_markup=btn)
+        return await message.answer("❌ Obuna bo‘ling!", reply_markup=btn)
 
-    code = message.text.strip()
-    movies = load_movies()
+    file_id = get_movie(message.text.strip())
 
-    if code in movies:
-        await bot.send_video(message.chat.id, movies[code])
+    if file_id:
+        await bot.send_video(message.chat.id, file_id)
     else:
-        await message.answer("❌ Bunday kino topilmadi")
+        await message.answer("❌ Topilmadi")
 
-# ===== FLASK (24/7) =====
+# ===== FLASK =====
 app = Flask("")
 
 @app.route("/")
@@ -171,8 +146,7 @@ def run():
     app.run(host="0.0.0.0", port=8080)
 
 def keep_alive():
-    t = Thread(target=run)
-    t.start()
+    Thread(target=run).start()
 
 # ===== RUN =====
 if __name__ == "__main__":
